@@ -95,6 +95,9 @@ func (s *Selector) ForceSet(name string) {
 	s.selected = name
 }
 
+// Refresh implements Refreshable. A selector has no cached decision to drop.
+func (s *Selector) Refresh() {}
+
 // Unwrap implements C.ProxyAdapter
 func (s *Selector) Unwrap(metadata *C.Metadata, touch bool) C.Proxy {
 	return s.selectedProxy(touch)

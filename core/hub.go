@@ -202,6 +202,26 @@ func handleChangeProxy(data string, fn func(string string)) {
 	}()
 }
 
+func handleRefreshGroup(groupName string) string {
+	runLock.Lock()
+	defer runLock.Unlock()
+	if !isInit {
+		return "core not initialized"
+	}
+	group, ok := tunnel.Proxies()[groupName]
+	if !ok {
+		return "Not found group"
+	}
+	adapterProxy, ok := group.(*adapter.Proxy)
+	if !ok {
+		return "Not found group"
+	}
+	if refresher, ok := adapterProxy.ProxyAdapter.(outboundgroup.Refreshable); ok {
+		refresher.Refresh()
+	}
+	return ""
+}
+
 func handleGetTraffic() string {
 	up, down := statistic.DefaultManager.NowTraffic(state.CurrentState.OnlyStatisticsProxy)
 	traffic := map[string]int64{

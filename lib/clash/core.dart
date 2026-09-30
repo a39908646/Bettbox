@@ -153,6 +153,11 @@ class ClashCore {
     return await clashInterface.changeProxy(changeProxyParams);
   }
 
+  /// Asks the core to drop the group's cached decision and re-pick a node.
+  FutureOr<String> refreshGroup(String groupName) async {
+    return await clashInterface.refreshGroup(groupName);
+  }
+
   Future<Mode> getMode() async {
     final modeStr = await clashInterface.getMode();
     return Mode.values.firstWhere(

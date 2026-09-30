@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/metacubex/mihomo/common/callback"
@@ -27,6 +28,7 @@ type URLTest struct {
 	disableUDP     bool
 	fastNode       C.Proxy
 	fastSingle     *singledo.Single[C.Proxy]
+	lastProbe      atomic.Int64
 }
 
 func (u *URLTest) Now() string {
@@ -51,6 +53,43 @@ func (u *URLTest) Set(name string) error {
 func (u *URLTest) ForceSet(name string) {
 	u.selected = name
 	u.fastSingle.Reset()
+}
+
+// Refresh drops the cached decision so the next evaluation re-picks a node
+// with the latest health-check/delay data.
+func (u *URLTest) Refresh() {
+	u.fastSingle.Reset()
+}
+
+// probeSelected probes the preferred (locked) node in the background while it is
+// considered unavailable, so that it can be switched back as soon as it recovers.
+// It is throttled to at most one probe per 30s and is only called while the group
+// is actually dialing.
+func (u *URLTest) probeSelected(proxies []C.Proxy) {
+	var target C.Proxy
+	for _, proxy := range proxies {
+		if proxy.Name() == u.selected {
+			target = proxy
+			break
+		}
+	}
+	if target == nil {
+		return
+	}
+	now := time.Now().Unix()
+	last := u.lastProbe.Load()
+	if now-last < 30 || !u.lastProbe.CompareAndSwap(last, now) {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		expectedStatus, _ := utils.NewUnsignedRanges[uint16](u.expectedStatus)
+		if _, err := target.URLTest(ctx, u.testUrl, expectedStatus); err == nil {
+			// The preferred node recovered: re-evaluate so we switch back to it.
+			u.fastSingle.Reset()
+		}
+	}()
 }
 
 // DialContext implements C.ProxyAdapter
@@ -112,6 +151,12 @@ func (u *URLTest) fast(touch bool) C.Proxy {
 					u.fastNode = proxy
 					return proxy, nil
 				}
+			}
+			// The preferred (locked) node is currently unavailable.
+			// Only probe it while the group is actually dialing, so that an idle
+			// client does not create extra connections (and battery drain).
+			if touch {
+				u.probeSelected(proxies)
 			}
 		}
 

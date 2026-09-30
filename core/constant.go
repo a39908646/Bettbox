@@ -100,6 +100,7 @@ const (
 	updateConfigMethod             Method = "updateConfig"
 	getProxiesMethod               Method = "getProxies"
 	changeProxyMethod              Method = "changeProxy"
+	refreshGroupMethod             Method = "refreshGroup"
 	getTrafficMethod               Method = "getTraffic"
 	getTotalTrafficMethod          Method = "getTotalTraffic"
 	resetTrafficMethod             Method = "resetTraffic"

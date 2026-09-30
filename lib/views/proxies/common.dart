@@ -185,7 +185,17 @@ Future<void> delayTest(
     await runTest();
     return;
   }
-  await delayTestCoordinator.run(groupName, runTest);
+  await delayTestCoordinator.run(groupName, () async {
+    try {
+      await runTest();
+    } finally {
+      // Let the core re-evaluate the group so it immediately switches to a node
+      // based on the freshly measured delays (including switching back to the
+      // preferred/locked node when the test shows it is alive again).
+      // Runs even when some tests failed, so a partial test still re-evaluates.
+      await globalState.appController.refreshGroup(groupName);
+    }
+  });
 }
 
 double getScrollToSelectedOffset({

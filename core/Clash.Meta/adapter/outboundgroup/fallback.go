@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/metacubex/mihomo/common/callback"
@@ -21,6 +22,7 @@ type Fallback struct {
 	testUrl        string
 	selected       string
 	expectedStatus string
+	lastProbe      atomic.Int64
 }
 
 func (f *Fallback) Now() string {
@@ -104,23 +106,58 @@ func (f *Fallback) Unwrap(metadata *C.Metadata, touch bool) C.Proxy {
 
 func (f *Fallback) findAliveProxy(touch bool) C.Proxy {
 	proxies := f.GetProxies(touch)
-	for _, proxy := range proxies {
-		if len(f.selected) == 0 {
+
+	// The preferred (locked) proxy keeps priority as long as it is alive.
+	if len(f.selected) != 0 {
+		for _, proxy := range proxies {
+			if proxy.Name() != f.selected {
+				continue
+			}
 			if proxy.AliveForTestUrl(f.testUrl) {
 				return proxy
 			}
-		} else {
-			if proxy.Name() == f.selected {
-				if proxy.AliveForTestUrl(f.testUrl) {
-					return proxy
-				} else {
-					f.selected = ""
-				}
+			// Keep the preference instead of dropping it. Only probe while the group
+			// is actually dialing, to avoid extra connections (and battery drain)
+			// when the client is idle.
+			if touch {
+				f.probeSelected(proxy)
 			}
+			break
+		}
+	}
+
+	// Degrade to the first alive proxy.
+	for _, proxy := range proxies {
+		if proxy.AliveForTestUrl(f.testUrl) {
+			return proxy
 		}
 	}
 
 	return proxies[0]
+}
+
+// Refresh implements Refreshable. A fallback group re-evaluates on every call,
+// so there is no cached decision to drop.
+func (f *Fallback) Refresh() {}
+
+// probeSelected probes the preferred (locked) node in the background while it is
+// considered unavailable. It is throttled to at most one probe per 30s and is
+// only called while the group is actually dialing.
+func (f *Fallback) probeSelected(target C.Proxy) {
+	if target == nil {
+		return
+	}
+	now := time.Now().Unix()
+	last := f.lastProbe.Load()
+	if now-last < 30 || !f.lastProbe.CompareAndSwap(last, now) {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		expectedStatus, _ := utils.NewUnsignedRanges[uint16](f.expectedStatus)
+		_, _ = target.URLTest(ctx, f.testUrl, expectedStatus)
+	}()
 }
 
 func (f *Fallback) Set(name string) error {

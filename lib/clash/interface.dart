@@ -38,6 +38,10 @@ mixin ClashInterface {
 
   FutureOr<String> changeProxy(ChangeProxyParams changeProxyParams);
 
+  /// Drops the group's cached decision so the core immediately re-picks a node
+  /// with the latest delay data (used after a delay test).
+  FutureOr<String> refreshGroup(String groupName);
+
   Future<bool> startListener();
 
   Future<bool> stopListener();
@@ -304,6 +308,16 @@ abstract class ClashHandlerInterface with ClashInterface {
     return invoke<String>(
       method: ActionMethod.changeProxy,
       data: json.encode(changeProxyParams),
+    );
+  }
+
+  @override
+  FutureOr<String> refreshGroup(String groupName) {
+    return invoke<String>(
+      method: ActionMethod.refreshGroup,
+      data: groupName,
+      timeout: const Duration(seconds: 5),
+      onTimeout: () => '',
     );
   }
 

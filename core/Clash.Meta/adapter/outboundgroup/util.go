@@ -35,3 +35,13 @@ type SelectAble interface {
 var _ SelectAble = (*Fallback)(nil)
 var _ SelectAble = (*URLTest)(nil)
 var _ SelectAble = (*Selector)(nil)
+
+// Refreshable drops a group's cached decision so that the next evaluation
+// re-picks a node with the latest health-check/delay data.
+type Refreshable interface {
+	Refresh()
+}
+
+var _ Refreshable = (*Fallback)(nil)
+var _ Refreshable = (*URLTest)(nil)
+var _ Refreshable = (*Selector)(nil)

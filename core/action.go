@@ -105,6 +105,9 @@ func handleAction(action *Action, result ActionResult) {
 			result.success(value)
 		})
 		return
+	case refreshGroupMethod:
+		result.success(handleRefreshGroup(action.Data.(string)))
+		return
 	case getTrafficMethod:
 		result.success(handleGetTraffic())
 		return

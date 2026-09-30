@@ -232,6 +232,7 @@ enum ActionMethod {
   getConfig,
   getProxies,
   changeProxy,
+  refreshGroup,
   getTraffic,
   getTotalTraffic,
   resetTraffic,

@@ -1005,6 +1005,13 @@ class AppController {
     addCheckIp();
   }
 
+  /// Re-evaluates a proxy group in the core with the latest delay data and
+  /// refreshes the UI so the effective node (highlight) updates immediately.
+  Future<void> refreshGroup(String groupName) async {
+    await clashCore.refreshGroup(groupName);
+    await updateGroups();
+  }
+
   Future<void> handleBackOrExit() async {
     if (_ref.read(backBlockProvider)) {
       return;
