@@ -57,12 +57,8 @@ abstract class AppBuilder {
       }
     }
 
-    buildArguments.addAll([
-      '--dart-define',
-      'FLUTTER_BUILD_NAME=$appBuildName',
-      '--dart-define',
-      'FLUTTER_BUILD_NUMBER=$appBuildNumber',
-    ]);
+    // Flutter 3.47+ reserves FLUTTER_BUILD_NAME/NUMBER and rejects them via
+    // --dart-define; versioning comes from pubspec/local.properties instead.
 
     ProcessResult processResult = await flutter.withEnv(environment).build(
       [buildSubcommand, ...buildArguments],
