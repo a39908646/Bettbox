@@ -2,6 +2,7 @@ import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
 import 'package:bett_box/models/models.dart';
 import 'package:bett_box/providers/config.dart';
+import 'package:bett_box/state.dart';
 import 'package:bett_box/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,62 @@ class OverrideItem extends ConsumerWidget {
         onChanged: (bool value) async {
           ref.read(overrideDnsProvider.notifier).value = value;
         },
+      ),
+    );
+  }
+}
+
+/// Whether the DNS options below are actually effective: they only apply
+/// when the override switch is on, or when the profile config has no
+/// enabled dns section (the app's patch DNS is the fallback).
+final _dnsPatchEffectiveProvider = FutureProvider.autoDispose<bool>((ref) async {
+  if (ref.watch(overrideDnsProvider)) return true;
+  final profileId = ref.watch(currentProfileIdProvider);
+  if (profileId == null || profileId.isEmpty) return false;
+  try {
+    final rawConfig = await globalState.getProfileConfig(profileId);
+    final dns = rawConfig['dns'];
+    return dns is Map ? dns['enable'] != true : true;
+  } catch (_) {
+    return true;
+  }
+});
+
+class OptionsSection extends ConsumerWidget {
+  const OptionsSection({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final effective = ref.watch(_dnsPatchEffectiveProvider).value ?? true;
+    Widget wrap(Widget item) => effective
+        ? item
+        : IgnorePointer(child: Opacity(opacity: 0.5, child: item));
+    return Column(
+      children: generateSection(
+        title: appLocalizations.options,
+        items: [
+          wrap(StatusItem()),
+          wrap(ListenItem()),
+          wrap(CacheAlgorithmItem()),
+          wrap(UseHostsItem()),
+          wrap(UseSystemHostsItem()),
+          wrap(IPv6Item()),
+          wrap(RespectRulesItem()),
+          wrap(PreferH3Item()),
+          wrap(DnsModeItem()),
+          wrap(FakeIpRangeItem()),
+          wrap(FakeIpRangeV6Item()),
+          wrap(FakeIpFilterModeItem()),
+          wrap(FakeIpFilterItem()),
+          wrap(FakeIpTtlItem()),
+          wrap(DefaultNameserverItem()),
+          wrap(NameserverPolicyItem()),
+          wrap(NameserverItem()),
+          wrap(FallbackItem()),
+          wrap(ProxyServerNameserverItem()),
+          wrap(DirectNameserverItem()),
+          wrap(DirectNameserverFollowPolicyItem()),
+        ],
       ),
     );
   }
@@ -878,32 +935,7 @@ class DomainItem extends StatelessWidget {
 
 final dnsItems = <Widget>[
   ...generateSection(items: const [OverrideItem()]),
-  ...generateSection(
-    title: appLocalizations.options,
-    items: const [
-      StatusItem(),
-      ListenItem(),
-      CacheAlgorithmItem(),
-      UseHostsItem(),
-      UseSystemHostsItem(),
-      IPv6Item(),
-      RespectRulesItem(),
-      PreferH3Item(),
-      DnsModeItem(),
-      FakeIpRangeItem(),
-      FakeIpRangeV6Item(),
-      FakeIpFilterModeItem(),
-      FakeIpFilterItem(),
-      FakeIpTtlItem(),
-      DefaultNameserverItem(),
-      NameserverPolicyItem(),
-      NameserverItem(),
-      FallbackItem(),
-      ProxyServerNameserverItem(),
-      DirectNameserverItem(),
-      DirectNameserverFollowPolicyItem(),
-    ],
-  ),
+  const OptionsSection(),
   ...generateSection(
     title: appLocalizations.fallbackFilter,
     items: const [

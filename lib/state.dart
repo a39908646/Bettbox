@@ -867,6 +867,11 @@ class GlobalState {
       );
     }
 
+    // Keep DNS AAAA resolution in sync with the IPv6 switch: without
+    // dns.ipv6, the core filters AAAA records and AAAA-only hosts (e.g.
+    // WebDAV servers) can never be resolved even with ipv6 enabled.
+    rawConfig['dns']['ipv6'] = realPatchConfig.ipv6;
+
     if (rawConfig['dns'] != null &&
         rawConfig['dns']['fallback-filter'] != null) {
       if (rawConfig['dns']['fallback-filter'] is Map) {
