@@ -140,7 +140,7 @@ class GlobalState {
     if (system.isWindows && (coreSHA256 == null || coreSHA256!.isEmpty)) {
       coreSHA256 = await _calcCoreSHA256();
     }
-    isPre = const String.fromEnvironment('APP_ENV') != 'stable';
+    isPre = const String.fromEnvironment('APP_ENV') == 'pre';
     appState = AppState(
       brightness: WidgetsBinding.instance.platformDispatcher.platformBrightness,
       version: version,
