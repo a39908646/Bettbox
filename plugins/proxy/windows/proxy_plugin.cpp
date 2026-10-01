@@ -11,6 +11,7 @@
 
 #pragma comment(lib, "wininet")
 #pragma comment(lib, "Rasapi32")
+#pragma comment(lib, "advapi32")
 
 // For getPlatformVersion; remove unless needed for your plugin implementation.
 #include <VersionHelpers.h>
@@ -21,6 +22,33 @@
 
 #include <memory>
 #include <sstream>
+
+// The Windows Settings proxy toggle reflects the legacy ProxyEnable value,
+// which INTERNET_OPTION_PER_CONNECTION_OPTION never updates. Keep both stores
+// in sync or the Settings UI shows the opposite of the actual state.
+bool setLegacyProxyRegistry(bool enable, const std::string& server)
+{
+  HKEY hKey;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                    L"Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+                    0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS)
+  {
+    return false;
+  }
+  DWORD enableValue = enable ? 1 : 0;
+  bool ok = RegSetValueExW(hKey, L"ProxyEnable", 0, REG_DWORD,
+                           reinterpret_cast<const BYTE*>(&enableValue),
+                           sizeof(enableValue)) == ERROR_SUCCESS;
+  if (enable && !server.empty())
+  {
+    std::wstring wServer(server.begin(), server.end());
+    ok = RegSetValueExW(hKey, L"ProxyServer", 0, REG_SZ,
+                        reinterpret_cast<const BYTE*>(wServer.c_str()),
+                        static_cast<DWORD>((wServer.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS && ok;
+  }
+  RegCloseKey(hKey);
+  return ok;
+}
 
 bool startProxy(const int port, const flutter::EncodableList& bypassDomain)
 {
@@ -96,6 +124,7 @@ bool startProxy(const int port, const flutter::EncodableList& bypassDomain)
 
   ok = InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0) && ok;
   ok = InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0) && ok;
+  ok = setLegacyProxyRegistry(true, url) && ok;
   return ok;
 }
 
@@ -142,6 +171,7 @@ bool stopProxy()
   delete[] list.pOptions;
   ok = InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0) && ok;
   ok = InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0) && ok;
+  ok = setLegacyProxyRegistry(false, "") && ok;
   return ok;
 }
 
