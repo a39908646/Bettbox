@@ -12,10 +12,16 @@ class Window {
   Future<void> init() async {
     final props = globalState.config.windowProps;
     if (system.isWindows) {
-      protocol.register('clash');
-      protocol.register('clashmeta');
-      protocol.register('flclash');
-      protocol.register('bettbox');
+      // Registering protocol handlers writes to the registry, which security
+      // software may block. A failure here must not take down the whole UI.
+      try {
+        protocol.register('clash');
+        protocol.register('clashmeta');
+        protocol.register('flclash');
+        protocol.register('bettbox');
+      } catch (e) {
+        commonPrint.log('Register protocol handlers failed: $e');
+      }
     }
     await windowManager.ensureInitialized();
     if (system.isMacOS && !globalState.config.appSetting.keepDockIcon) {
