@@ -22,7 +22,7 @@
 #include <memory>
 #include <sstream>
 
-void startProxy(const int port, const flutter::EncodableList& bypassDomain)
+bool startProxy(const int port, const flutter::EncodableList& bypassDomain)
 {
   INTERNET_PER_CONN_OPTION_LIST list;
   DWORD dwBufSize = sizeof(list);
@@ -53,7 +53,7 @@ void startProxy(const int port, const flutter::EncodableList& bypassDomain)
 
   if (!list.pOptions)
   {
-    return;
+    return false;
   }
 
   list.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
@@ -65,7 +65,7 @@ void startProxy(const int port, const flutter::EncodableList& bypassDomain)
   list.pOptions[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
   list.pOptions[2].Value.pszValue = bypassAddr;
 
-  InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
+  bool ok = InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
 
   RASENTRYNAME entry;
   entry.dwSize = sizeof(entry);
@@ -82,23 +82,24 @@ void startProxy(const int port, const flutter::EncodableList& bypassDomain)
   }
   if (ret != ERROR_SUCCESS)
   {
-    return;
+    return false;
   }
   for (DWORD i = 0; i < count; i++)
   {
     list.pszConnection = entryAddr[i].szEntryName;
-    InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
+    ok = InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize) && ok;
   }
 
   delete[] fullAddr;
   delete[] bypassAddr;
   delete[] list.pOptions;
 
-  InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0);
-  InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+  ok = InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0) && ok;
+  ok = InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0) && ok;
+  return ok;
 }
 
-void stopProxy()
+bool stopProxy()
 {
   INTERNET_PER_CONN_OPTION_LIST list;
   DWORD dwBufSize = sizeof(list);
@@ -109,12 +110,12 @@ void stopProxy()
   list.pOptions = new INTERNET_PER_CONN_OPTION[1];
   if (nullptr == list.pOptions)
   {
-    return;
+    return false;
   }
   list.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
   list.pOptions[0].Value.dwValue = PROXY_TYPE_DIRECT;
 
-  InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
+  bool ok = InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
 
   RASENTRYNAME entry;
   entry.dwSize = sizeof(entry);
@@ -131,16 +132,17 @@ void stopProxy()
   }
   if (ret != ERROR_SUCCESS)
   {
-    return;
+    return false;
   }
   for (DWORD i = 0; i < count; i++)
   {
     list.pszConnection = entryAddr[i].szEntryName;
-    InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
+    ok = InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize) && ok;
   }
   delete[] list.pOptions;
-  InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0);
-  InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+  ok = InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0) && ok;
+  ok = InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0) && ok;
+  return ok;
 }
 
 namespace proxy
@@ -199,16 +201,14 @@ namespace proxy
   {
     if (method_call.method_name().compare("StopProxy") == 0)
     {
-      stopProxy();
-      result->Success(true);
+      result->Success(stopProxy());
     }
     else if (method_call.method_name().compare("StartProxy") == 0)
     {
       auto *arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
       auto port = std::get<int>(arguments->at(flutter::EncodableValue("port")));
       auto bypassDomain = std::get<flutter::EncodableList>(arguments->at(flutter::EncodableValue("bypassDomain")));
-      startProxy(port, bypassDomain);
-      result->Success(true);
+      result->Success(startProxy(port, bypassDomain));
     }
     else
     {

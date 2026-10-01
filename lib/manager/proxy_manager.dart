@@ -1,4 +1,4 @@
-import 'package:bett_box/common/proxy.dart';
+import 'package:bett_box/common/common.dart';
 import 'package:bett_box/models/models.dart';
 import 'package:bett_box/providers/state.dart';
 import 'package:flutter/material.dart';
@@ -19,9 +19,16 @@ class _ProxyManagerState extends ConsumerState<ProxyManager> {
     final systemProxy = proxyState.systemProxy;
     final port = proxyState.port;
     if (isStart && systemProxy) {
-      proxy?.startProxy(port, proxyState.bypassDomain);
+      final ok =
+          await proxy?.startProxy(port, proxyState.bypassDomain) ?? false;
+      if (!ok) {
+        commonPrint.log('Set system proxy failed');
+      }
     } else {
-      proxy?.stopProxy();
+      final ok = await proxy?.stopProxy() ?? false;
+      if (!ok) {
+        commonPrint.log('Clear system proxy failed');
+      }
     }
   }
 
