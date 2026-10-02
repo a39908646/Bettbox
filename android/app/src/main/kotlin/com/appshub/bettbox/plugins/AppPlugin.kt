@@ -70,6 +70,14 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         private const val ICON_SIZE_DP = 48
         private const val VPN_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
+        private const val LOCAL_NETWORK_PERMISSION_REQUEST_CODE = 1003
+
+        // Android 16+ gates access to devices on the local network behind this
+        // runtime permission. It is declared in the manifest (which opts the app
+        // into Local Network Protection), so it must also be requested at
+        // runtime, otherwise LAN connections are silently dropped.
+        private const val ACCESS_LOCAL_NETWORK_PERMISSION =
+            "android.permission.ACCESS_LOCAL_NETWORK"
         private const val CACHE_MAX_FILES = 500
         private const val PNG_MAGIC_SIZE = 8
 
@@ -125,6 +133,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private var isBlockNotification = false
     private var isActivityAttached = false
+    private var localNetworkPermissionResult: MethodChannel.Result? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -255,6 +264,12 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             }
             "hasCameraPermission" -> {
                 result.success(hasCameraPermission())
+            }
+            "hasLocalNetworkPermission" -> {
+                result.success(hasLocalNetworkPermission())
+            }
+            "requestLocalNetworkPermission" -> {
+                requestLocalNetworkPermission(result)
             }
             "openAppSettings" -> {
                 openAppSettings()
@@ -522,6 +537,12 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private fun onRequestPermissionsResultListener(requestCode: Int, permissions: Array<String>, grantResults: IntArray): Boolean {
         if (!isActivityAttached) return false
         if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) isBlockNotification = true
+        if (requestCode == LOCAL_NETWORK_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            localNetworkPermissionResult?.success(granted)
+            localNetworkPermissionResult = null
+        }
         return true
     }
 
@@ -590,6 +611,39 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(BettboxApplication.getAppContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasLocalNetworkPermission(): Boolean {
+        // Local Network Protection only exists on Android 16+.
+        if (Build.VERSION.SDK_INT < 36) return true
+        return ContextCompat.checkSelfPermission(
+            BettboxApplication.getAppContext(),
+            ACCESS_LOCAL_NETWORK_PERMISSION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestLocalNetworkPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < 36 || hasLocalNetworkPermission()) {
+            result.success(hasLocalNetworkPermission())
+            return
+        }
+        val activity = activityRef?.get()
+        if (activity == null || localNetworkPermissionResult != null) {
+            // No activity to host the dialog (or one is already pending).
+            result.success(hasLocalNetworkPermission())
+            return
+        }
+        localNetworkPermissionResult = result
+        runCatching {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(ACCESS_LOCAL_NETWORK_PERMISSION),
+                LOCAL_NETWORK_PERMISSION_REQUEST_CODE
+            )
+        }.onFailure {
+            localNetworkPermissionResult = null
+            result.success(false)
+        }
+    }
 
     private fun openAppSettings() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {

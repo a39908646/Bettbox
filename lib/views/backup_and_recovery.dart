@@ -53,6 +53,7 @@ class _BackupAndRecoveryState extends ConsumerState<BackupAndRecovery> {
         return await client.backup(Uint8List.fromList(backupData));
       },
       needLoading: true,
+      silence: false,
       title: appLocalizations.backup,
     );
     if (res != true) return;
@@ -76,6 +77,7 @@ class _BackupAndRecoveryState extends ConsumerState<BackupAndRecovery> {
         return true;
       },
       needLoading: true,
+      silence: false,
       title: appLocalizations.recovery,
     );
     if (res != true) return;
@@ -93,6 +95,7 @@ class _BackupAndRecoveryState extends ConsumerState<BackupAndRecovery> {
     final files = await globalState.appController.safeRun<List<webdav.File>>(
       () => client.getBackupFiles(),
       needLoading: true,
+      silence: false,
       title: appLocalizations.recovery,
     );
     if (!context.mounted) return;

@@ -62,6 +62,23 @@ class App {
     return result ?? true;
   }
 
+  /// Whether the app is allowed to reach devices on the local network
+  /// (Android 16+ Local Network Protection). Always true on other platforms.
+  Future<bool> hasLocalNetworkPermission() async {
+    final result = await methodChannel.invokeMethod<bool>(
+      'hasLocalNetworkPermission',
+    );
+    return result ?? true;
+  }
+
+  /// Requests the local network permission, returning the resulting state.
+  Future<bool> requestLocalNetworkPermission() async {
+    final result = await methodChannel.invokeMethod<bool>(
+      'requestLocalNetworkPermission',
+    );
+    return result ?? true;
+  }
+
   Future<void> requestPackageListPermission() async {
     await methodChannel.invokeMethod<void>('requestPackageListPermission');
   }

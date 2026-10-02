@@ -81,6 +81,18 @@ class ApplicationState extends ConsumerState<Application>
     globalState.appController.initLink();
     if (system.isAndroid) {
       app.initShortcuts();
+      // Android 16+ blocks local network access unless this runtime permission
+      // is granted, which silently breaks LAN WebDAV servers and LAN proxies.
+      Future.delayed(const Duration(seconds: 1), () async {
+        try {
+          if (!await app.hasLocalNetworkPermission()) {
+            final granted = await app.requestLocalNetworkPermission();
+            commonPrint.log('Local network permission granted: $granted');
+          }
+        } catch (e) {
+          commonPrint.log('Local network permission request failed: $e');
+        }
+      });
     }
     Future.delayed(const Duration(seconds: 3), () {
       globalState.warmupCommonDialog();
