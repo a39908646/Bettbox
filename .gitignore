@@ -83,3 +83,5 @@ app.*.map.json
 /assets/data/geoip.metadb
 /assets/data/ASN.mmdb
 /assets/data/zash.zip
+# Rust build artifacts from manual/plugin builds
+plugins/code_forge/rust/target/

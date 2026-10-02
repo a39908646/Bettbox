@@ -56,8 +56,12 @@ class AndroidEnvironment {
 
   bool ndkIsInstalled() {
     final ndkPath = path.join(sdkPath, 'ndk', ndkVersion);
-    final ndkPackageXml = File(path.join(ndkPath, 'package.xml'));
-    return ndkPackageXml.existsSync();
+    // NDKs installed by recent sdkmanager/Android Studio only ship
+    // `source.properties`, older ones ship `package.xml`. Accept either,
+    // otherwise an installed NDK is treated as missing and the build tool
+    // tries to reinstall it (which fails).
+    return File(path.join(ndkPath, 'source.properties')).existsSync() ||
+        File(path.join(ndkPath, 'package.xml')).existsSync();
   }
 
   void installNdk({
